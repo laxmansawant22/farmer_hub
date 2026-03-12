@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "829093301668",
+    "project_id": "farmers-22",
+    "storage_bucket": "farmers-22.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829093301668:android:f52ecbfda6cd8ed5240531",
+        "android_client_info": {
+          "package_name": "com.example.laxman_1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "829093301668-8bjq8vrm8m5ri89agt72fi07vgfpbh2d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.laxman_1",
+            "certificate_hash": "8a7361f3a7d86c04e25bc096b3f98ae20f7269f0"
+          }
+        },
+        {
+          "client_id": "829093301668-0n60bsfrcs0rgf3oad7eo2urvfkm1b11.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxOhYocpdomBDDZBRKtF-_Qvgp7Bn-3go"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "829093301668-0n60bsfrcs0rgf3oad7eo2urvfkm1b11.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "829093301668-hnscv7ea0dqla05lc01iec7eoh7u4iv6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.laxman1"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import '../translations.dart'; // 📍 Added translation import
 
 class AddProductScreen extends StatefulWidget {
   final Map<String, dynamic>? existingProduct;
@@ -15,7 +16,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController(); // 📍 Price Controller
+  final TextEditingController _priceController = TextEditingController();
 
   String _selectedUnit = 'kg';
   String _selectedType = 'Vegetable';
@@ -28,7 +29,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (widget.existingProduct != null) {
       _nameController.text = widget.existingProduct!['name'];
       _qtyController.text = widget.existingProduct!['qty'];
-      _priceController.text = widget.existingProduct!['price'] ?? ""; // 📍 Load existing price
+      _priceController.text = widget.existingProduct!['price'] ?? "";
       _selectedUnit = widget.existingProduct!['unit'];
       _selectedType = widget.existingProduct!['type'];
       _images = List<File>.from(widget.existingProduct!['images']);
@@ -47,7 +48,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void _submitData() {
     if (_images.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Requirement: Please take at least one photo"), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text(AppTranslations.translate(context, 'error_photo_required')), // 📍 Translated
+            backgroundColor: Colors.red
+        ),
       );
       return;
     }
@@ -56,7 +60,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       Navigator.pop(context, {
         'name': _nameController.text.trim(),
         'qty': _qtyController.text.trim(),
-        'price': _priceController.text.trim(), // 📍 Pass price back
+        'price': _priceController.text.trim(),
         'unit': _selectedUnit,
         'type': _selectedType,
         'images': _images,
@@ -68,7 +72,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingProduct == null ? "Add New Crop" : "Edit Crop"),
+        // 📍 Dynamic Title
+        title: Text(widget.existingProduct == null
+            ? AppTranslations.translate(context, 'add_new_crop')
+            : AppTranslations.translate(context, 'edit_crop')),
         backgroundColor: const Color(0xFF4A6D41),
         foregroundColor: Colors.white,
       ),
@@ -79,7 +86,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Capture Photos (Compulsory)*", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                  AppTranslations.translate(context, 'capture_photos'), // 📍 Translated
+                  style: const TextStyle(fontWeight: FontWeight.bold)
+              ),
               const SizedBox(height: 10),
 
               SizedBox(
@@ -123,23 +133,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: "Product Name*", border: OutlineInputBorder()),
-                validator: (value) => (value == null || value.isEmpty) ? 'Please enter crop name' : null,
+                decoration: InputDecoration(
+                    labelText: AppTranslations.translate(context, 'product_name'), // 📍 Translated
+                    border: const OutlineInputBorder()
+                ),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? AppTranslations.translate(context, 'err_crop_name') // 📍 Translated
+                    : null,
               ),
               const SizedBox(height: 20),
 
-              // Price Field (Compulsory)
               TextFormField(
                 controller: _priceController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Price (per unit)*",
+                decoration: InputDecoration(
+                  labelText: AppTranslations.translate(context, 'price_per_unit'), // 📍 Translated
                   prefixText: "₹ ",
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter price';
-                  if (double.tryParse(value) == null || double.parse(value) <= 0) return 'Invalid price';
+                  if (value == null || value.isEmpty) return AppTranslations.translate(context, 'err_price');
+                  if (double.tryParse(value) == null || double.parse(value) <= 0) return AppTranslations.translate(context, 'err_invalid');
                   return null;
                 },
               ),
@@ -152,10 +166,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     child: TextFormField(
                       controller: _qtyController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: "Quantity*", border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                          labelText: AppTranslations.translate(context, 'quantity'), // 📍 Translated
+                          border: const OutlineInputBorder()
+                      ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        if (double.tryParse(value) == null || double.parse(value) <= 0) return 'Invalid';
+                        if (value == null || value.isEmpty) return AppTranslations.translate(context, 'err_required');
+                        if (double.tryParse(value) == null || double.parse(value) <= 0) return AppTranslations.translate(context, 'err_invalid');
                         return null;
                       },
                     ),
@@ -165,7 +182,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     child: DropdownButtonFormField<String>(
                       value: _selectedUnit,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
-                      items: ['kg', 'quintal', 'ton', 'piece'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      // 📍 Logic to translate units while keeping the backend keys
+                      items: ['kg', 'quintal', 'ton', 'piece'].map((u) => DropdownMenuItem(
+                          value: u,
+                          child: Text(AppTranslations.translate(context, u))
+                      )).toList(),
                       onChanged: (val) => setState(() => _selectedUnit = val!),
                     ),
                   ),
@@ -175,8 +196,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               DropdownButtonFormField<String>(
                 value: _selectedType,
-                decoration: const InputDecoration(labelText: "Crop Type", border: OutlineInputBorder()),
-                items: ['Vegetable', 'Fruit', 'Grain', 'Pulse'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                decoration: InputDecoration(
+                    labelText: AppTranslations.translate(context, 'crop_type'), // 📍 Translated
+                    border: const OutlineInputBorder()
+                ),
+                // 📍 Logic to translate types while keeping the backend keys
+                items: ['Vegetable', 'Fruit', 'Grain', 'Pulse'].map((t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(AppTranslations.translate(context, t.toLowerCase()))
+                )).toList(),
                 onChanged: (val) => setState(() => _selectedType = val!),
               ),
               const SizedBox(height: 40),
@@ -189,7 +217,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  widget.existingProduct == null ? "LIST PRODUCT" : "UPDATE PRODUCT",
+                  widget.existingProduct == null
+                      ? AppTranslations.translate(context, 'list_product')
+                      : AppTranslations.translate(context, 'update_product'), // 📍 Translated
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),

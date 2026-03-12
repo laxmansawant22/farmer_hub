@@ -31,32 +31,41 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # 📍 CORRECT: This must have the SAME amount of spaces as 'flutter:'
-  image_picker: ^1.0.7
-  cupertino_icons: ^1.0.8
+  # 📍 Critical for translation logic
+  flutter_localizations:
+    sdk: flutter
+  intl: any # 📍 ADD THIS: Required by flutter_localizations for date/number formatting
+
+  # 📍 Persistence and UI
   shared_preferences: ^2.2.2
+  image_picker: ^1.1.0
+
+  # 📍 Firebase Suite (Aligned Versions)
+  firebase_core: ^3.10.1
+  firebase_auth: ^5.5.0
+  cloud_firestore: ^5.0.0
+  firebase_storage: ^12.4.10
+  google_sign_in: ^6.2.2
+  geolocator: ^13.0.1
+  fl_chart: ^0.66.0
+  pdf: ^3.10.8
+  printing: ^5.11.1
+  flutter_local_notifications: ^17.0.0  # Use latest
+  timezone: ^0.9.4
+
+# 📍 Don't forget to enable assets for your Google Logo!
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^5.0.0
 
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
-  flutter_lints: ^6.0.0
-
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/google_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

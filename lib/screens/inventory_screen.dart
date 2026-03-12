@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'home_screen.dart'; // To access the Product model
+import '../translations.dart'; // 📍 Added translation import
+import 'home_screen.dart';
 import 'add_product_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -21,7 +22,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _filteredProducts = widget.products;
   }
 
-  // 🔍 Search Logic
   void _runFilter(String enteredKeyword) {
     List<Product> results = [];
     if (enteredKeyword.isEmpty) {
@@ -38,7 +38,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
-  // 📝 Edit Logic (Handles the new Price field)
   void _editProduct(int index) async {
     final productToEdit = _filteredProducts[index];
     final actualIndex = widget.products.indexOf(productToEdit);
@@ -50,7 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           existingProduct: {
             'name': widget.products[actualIndex].name,
             'qty': widget.products[actualIndex].qty,
-            'price': widget.products[actualIndex].price, // 📍 Passing price
+            'price': widget.products[actualIndex].price,
             'unit': widget.products[actualIndex].unit,
             'type': widget.products[actualIndex].type,
             'images': widget.products[actualIndex].images,
@@ -64,7 +63,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         widget.products[actualIndex] = Product(
           name: result['name'],
           qty: result['qty'],
-          price: result['price'], // 📍 Saving updated price
+          price: result['price'],
           unit: result['unit'],
           type: result['type'],
           images: result['images'],
@@ -74,7 +73,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  // 🗑️ Delete Logic with Confirmation
   void _deleteProduct(int index) {
     final productToDelete = _filteredProducts[index];
     final actualIndex = widget.products.indexOf(productToDelete);
@@ -84,12 +82,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Confirm Delete"),
-        content: Text("Are you sure you want to remove '${productToDelete.name}' from your inventory?"),
+        title: Text(AppTranslations.translate(context, 'confirm_delete')), // 📍 Translated
+        content: Text(
+            "${AppTranslations.translate(context, 'delete_warning')} '${productToDelete.name}'?"
+        ), // 📍 Translated
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text(AppTranslations.translate(context, 'cancel')), // 📍 Translated
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -100,10 +100,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
               });
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("${productToDelete.name} deleted")),
+                SnackBar(content: Text("${productToDelete.name} ${AppTranslations.translate(context, 'deleted')}")),
               );
             },
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            child: Text(
+                AppTranslations.translate(context, 'delete'), // 📍 Translated
+                style: const TextStyle(color: Colors.white)
+            ),
           ),
         ],
       ),
@@ -119,16 +122,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
           controller: _searchController,
           onChanged: (value) => _runFilter(value),
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: "Search your crops...",
-            hintStyle: TextStyle(color: Colors.white70),
+          decoration: InputDecoration(
+            hintText: AppTranslations.translate(context, 'search_crops'), // 📍 Translated
+            hintStyle: const TextStyle(color: Colors.white70),
             border: InputBorder.none,
-            icon: Icon(Icons.search, color: Colors.white),
+            icon: const Icon(Icons.search, color: Colors.white),
           ),
         ),
       ),
       body: _filteredProducts.isEmpty
-          ? const Center(child: Text("No crops found in inventory"))
+          ? Center(child: Text(AppTranslations.translate(context, 'no_crops_found'))) // 📍 Translated
           : ListView.builder(
         padding: const EdgeInsets.all(15),
         itemCount: _filteredProducts.length,
@@ -153,9 +156,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Quantity: ${item.qty} ${item.unit}"),
+                  // 📍 Translated Labels
+                  Text("${AppTranslations.translate(context, 'quantity')}: ${item.qty} ${AppTranslations.translate(context, item.unit)}"),
                   Text(
-                      "Price: ₹${item.price} per ${item.unit}",
+                      "${AppTranslations.translate(context, 'price')}: ₹${item.price} ${AppTranslations.translate(context, 'per')} ${AppTranslations.translate(context, item.unit)}",
                       style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)
                   ),
                 ],

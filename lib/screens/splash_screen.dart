@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'login_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -10,15 +8,18 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _isVisible = false;
+
   @override
   void initState() {
     super.initState();
-    // ⏲️ Timer to move to the next screen after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginSelectionScreen()),
-      );
+    // 📍 Trigger the fade-in animation after a tiny delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _isVisible = true;
+        });
+      }
     });
   }
 
@@ -27,23 +28,35 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF2E7D32), // Matches your theme
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 📍 Replace with your logo image asset later
-            const Icon(Icons.eco, size: 100, color: Colors.white),
-            const SizedBox(height: 20),
-            const Text(
-              "AgriConnect",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        child: AnimatedOpacity(
+          opacity: _isVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 1200), // Smooth 1.2s fade
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 📍 Logo Icon
+              const Icon(Icons.eco, size: 100, color: Colors.white),
+              const SizedBox(height: 20),
+              const Text(
+                "AgriConnect",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            const CircularProgressIndicator(color: Colors.white),
-          ],
+              const SizedBox(height: 30),
+              // Subtle loader at the bottom
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
