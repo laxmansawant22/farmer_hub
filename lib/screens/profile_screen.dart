@@ -7,7 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../translations.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String role;
+  final String role; // 'farmer', 'store', or 'customer'
   const ProfileScreen({super.key, required this.role});
 
   @override
@@ -35,11 +35,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _farmPhotos.add(File(pickedFile.path));
         }
       });
+      // Note: You would typically upload this to Firestore here
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 📍 Dynamic Theme Color based on role
     final Color themeColor = widget.role == 'farmer'
         ? const Color(0xFF4A6D41)
         : widget.role == 'store'
@@ -66,15 +68,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           String imageUrlBase64 = "";
           String farmType = "Not Specified";
           String farmSize = "Not Specified";
+          String storeName = "Not Specified";
 
           if (snapshot.hasData && snapshot.data!.exists) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
             name = data['name'] ?? name;
             phone = data['phone'] ?? phone;
             address = data['address'] ?? address;
-            imageUrlBase64 = data['imageUrl'] ?? ""; // This is base64 in your DB
+            imageUrlBase64 = data['imageUrl'] ?? "";
             farmType = data['farmType'] ?? farmType;
             farmSize = data['farmSize'] ?? farmSize;
+            storeName = data['storeName'] ?? storeName;
           }
 
           return SingleChildScrollView(
@@ -88,7 +92,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[200],
-                        // 📍 FIXED: Uses MemoryImage to decode the Base64 string from Firestore
                         backgroundImage: _profileImage != null
                             ? FileImage(_profileImage!)
                             : (imageUrlBase64.isNotEmpty
@@ -120,31 +123,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 30),
                 const Divider(),
 
-                // USER DETAILS SECTION
+                // COMMON USER DETAILS
                 _buildInfoTile(Icons.phone, "Phone Number", phone, themeColor),
                 _buildInfoTile(Icons.location_on, "Address", address, themeColor),
-                _buildInfoTile(Icons.badge, "Role", AppTranslations.translate(context, widget.role + '_badge'), themeColor),
+                _buildInfoTile(Icons.badge, "Role", widget.role.toUpperCase(), themeColor),
 
-                // 📍 NEW: FARM DETAILS SECTION (Shows Farm Type & Size)
+                // 📍 FARMER SPECIFIC SECTION
                 if (widget.role == 'farmer') ...[
                   const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Text("Farm Details", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: themeColor)),
-                  ),
+                  _buildSectionHeader("Farm Details", themeColor),
                   _buildInfoTile(Icons.agriculture, "Farm Type", farmType, themeColor),
                   _buildInfoTile(Icons.straighten, "Farm Size", farmSize, themeColor),
                 ],
 
+                // 📍 STORE SPECIFIC SECTION
+                if (widget.role == 'store') ...[
+                  const Divider(),
+                  _buildSectionHeader("Store Details", themeColor),
+                  _buildInfoTile(Icons.storefront, "Store Name", storeName, themeColor),
+                ],
+
                 const SizedBox(height: 30),
 
-                // FARM PHOTOS SECTION
+                // 📍 PHOTOS SECTION (Hidden for Customers)
                 if (widget.role == 'farmer' || widget.role == 'store') ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                          AppTranslations.translate(context, widget.role + '_photos_title'),
+                          widget.role == 'farmer' ? "Farm Photos" : "Store Photos",
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                       ),
                       TextButton.icon(
@@ -158,10 +165,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 10),
                   _farmPhotos.isEmpty ? _buildEmptyState() : _buildPhotoGrid(),
                 ],
+
+                const SizedBox(height: 20),
+
+                // LOGOUT BUTTON
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await FirebaseAuth.instance.signOut();
+                    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  label: const Text("Logout", style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
       ),
     );
   }
@@ -230,10 +263,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
       ),
-      child: Center(
+      child: const Center(
           child: Text(
-              AppTranslations.translate(context, 'no_photos_yet'),
-              style: const TextStyle(color: Colors.grey)
+              "No photos uploaded yet",
+              style: TextStyle(color: Colors.grey)
           )
       ),
     );

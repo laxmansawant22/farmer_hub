@@ -24,14 +24,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _postController = TextEditingController();
   final _otherFarmTypeController = TextEditingController();
 
+  // 📍 New Controllers for Farm Size
+  final _farmSizeController = TextEditingController();
+
   // Photo Logic
   File? _selectedImageFile;
   String _currentImageUrlBase64 = "";
+
+  // 📍 New Farm Photo Logic
+  File? _selectedFarmImageFile;
+  String _currentFarmImageUrlBase64 = "";
+
   final ImagePicker _picker = ImagePicker();
 
   // Farm Type Logic
   String _selectedFarmType = 'Pure Organic';
   bool _showOtherField = true;
+
+  // 📍 New Farm Size Unit Logic
+  String _selectedFarmUnit = 'Acre';
 
   // Location Logic
   double? _latitude;
@@ -69,7 +80,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _longitude = data['longitude'];
         _currentImageUrlBase64 = data['imageUrl'] ?? "";
 
+        // Load Farm Specific Data
         if (widget.role == 'farmer') {
+          _farmSizeController.text = data['farmSize']?.toString() ?? "";
+          _selectedFarmUnit = data['farmUnit'] ?? 'Acre';
+          _currentFarmImageUrlBase64 = data['farmImageUrl'] ?? "";
+
           String savedType = data['farmType'] ?? 'Pure Organic';
           if (['Pure Organic', 'Fertilizer Based'].contains(savedType)) {
             _selectedFarmType = savedType;
@@ -86,7 +102,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _pickProfileImage() async {
+  Future<void> _pickImage(bool isProfile) async {
     final XFile? pickedFile = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 50,
@@ -94,7 +110,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (pickedFile != null) {
       setState(() {
-        _selectedImageFile = File(pickedFile.path);
+        if (isProfile) {
+          _selectedImageFile = File(pickedFile.path);
+        } else {
+          _selectedFarmImageFile = File(pickedFile.path);
+        }
       });
     }
   }
@@ -153,6 +173,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (widget.role == 'farmer') {
       updateData['farmType'] = _showOtherField ? _otherFarmTypeController.text.trim() : _selectedFarmType;
+      updateData['farmSize'] = double.tryParse(_farmSizeController.text.trim()) ?? 0.0;
+      updateData['farmUnit'] = _selectedFarmUnit;
+
+      // Save Farm Image if new one selected
+      if (_selectedFarmImageFile != null) {
+        List<int> farmImageBytes = await _selectedFarmImageFile!.readAsBytes();
+        updateData['farmImageUrl'] = base64Encode(farmImageBytes);
+      }
     }
 
     if (_selectedImageFile != null) {
@@ -169,9 +197,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     Navigator.pop(context, true);
   }
 
-  // 📍 Double Confirmation Logic for Account Deletion
+  // Double Confirmation Logic for Account Deletion
   Future<void> _confirmDeleteAccount() async {
-    // FIRST POP-UP: Email warning
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -182,7 +209,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _showFinalDeleteWarning(); // Trigger second pop-up
+              _showFinalDeleteWarning();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             child: const Text("I Understand, Proceed", style: TextStyle(color: Colors.white)),
@@ -192,7 +219,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // 📍 SECOND POP-UP: Final verification
   Future<void> _showFinalDeleteWarning() async {
     showDialog(
       context: context,
@@ -244,6 +270,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Profile Photo Section
               Center(
                 child: Stack(
                   children: [
@@ -263,11 +290,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
-                        onTap: _pickProfileImage,
+                        onTap: () => _pickImage(true),
                         child: CircleAvatar(
                           backgroundColor: themeColor,
                           radius: 18,
-                          child: const Icon(Icons.edit, size: 18, color: Colors.white),
+                          child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
                         ),
                       ),
                     ),
@@ -279,7 +306,81 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _buildEditField(_nameController, 'full_name', Icons.person),
               _buildPhoneField(),
 
+              // 📍 Farmer Specific Section: Farm Photo & Farm Size
               if (widget.role == 'farmer') ...[
+                const Divider(height: 40),
+                const Text("Farm Information", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4A6D41))),
+                const SizedBox(height: 15),
+
+                // Farm Photo Capture
+                const Text("Farm Photo", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () => _pickImage(false),
+                  child: Container(
+                    height: 150,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[400]!),
+                      image: _selectedFarmImageFile != null
+                          ? DecorationImage(image: FileImage(_selectedFarmImageFile!), fit: BoxFit.cover)
+                          : (_currentFarmImageUrlBase64.isNotEmpty
+                          ? DecorationImage(image: MemoryImage(base64Decode(_currentFarmImageUrlBase64)), fit: BoxFit.cover)
+                          : null),
+                    ),
+                    child: (_selectedFarmImageFile == null && _currentFarmImageUrlBase64.isEmpty)
+                        ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_a_photo, size: 40, color: themeColor),
+                        const Text("Capture Farm Photo", style: TextStyle(fontSize: 12)),
+                      ],
+                    )
+                        : Align(
+                      alignment: Alignment.bottomRight,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.edit, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Farm Size & Unit Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _buildEditField(_farmSizeController, 'Farm Size', Icons.straighten, keyboardType: TextInputType.number),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Unit", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 5),
+                          DropdownButtonFormField<String>(
+                            value: _selectedFarmUnit,
+                            decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                            items: ['Acre', 'Gunte', 'Hectare']
+                                .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13))))
+                                .toList(),
+                            onChanged: (val) => setState(() => _selectedFarmUnit = val!),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
                 const Text("Farm Type", style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
@@ -301,6 +402,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 15),
                 if (_showOtherField)
                   _buildEditField(_otherFarmTypeController, 'Specify Farm Type', Icons.edit_note),
+                const Divider(height: 40),
               ],
 
               _buildEditField(_addressController, 'address', Icons.location_on),
@@ -359,13 +461,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildEditField(TextEditingController controller, String translationKey, IconData icon) {
+  Widget _buildEditField(TextEditingController controller, String translationKey, IconData icon, {TextInputType keyboardType = TextInputType.text}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: TextFormField(
         controller: controller,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
-          labelText: AppTranslations.translate(context, translationKey),
+          labelText: translationKey.startsWith('full') || translationKey.startsWith('address') || translationKey.startsWith('post')
+              ? AppTranslations.translate(context, translationKey)
+              : translationKey,
           prefixIcon: Icon(icon, color: themeColor),
           border: const OutlineInputBorder(),
           focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: themeColor, width: 2)),

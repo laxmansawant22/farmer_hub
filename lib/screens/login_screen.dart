@@ -5,9 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'registration_screen.dart';
 import '../translations.dart';
-import 'store_dashboard_screen.dart';
+import '../Store/store_dashboard_screen.dart';
 import 'home_screen.dart';
-import 'customer_market_screen.dart';
+import '../customer/customer_market_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else if (role == 'customer') {
       destination = const CustomerMarketScreen();
     } else {
-      destination = const StoreDashboardScreen();
+      destination = const StoreScreen();
     }
 
     Navigator.pushAndRemoveUntil(

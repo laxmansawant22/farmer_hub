@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../translations.dart';
 import 'login_screen.dart';
-import 'registration_screen.dart'; // 📍 Ensure this is imported for 'Create an Account'
 
 class LoginSelectionScreen extends StatefulWidget {
   const LoginSelectionScreen({super.key});

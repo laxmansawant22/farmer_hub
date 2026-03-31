@@ -47,12 +47,16 @@ dependencies:
   firebase_storage: ^12.4.10
   google_sign_in: ^6.2.2
   geolocator: ^13.0.1
-  fl_chart: ^0.66.0
+  geocoding: ^3.0.0
+  fl_chart: ^1.2.0
   pdf: ^3.10.8
   printing: ^5.11.1
   flutter_local_notifications: ^17.0.0  # Use latest
   timezone: ^0.9.4
-
+  url_launcher: ^6.3.0
+  firebase_messaging: ^15.2.10
+  path_provider: ^2.1.2
+  share_plus: ^7.2.2
 # 📍 Don't forget to enable assets for your Google Logo!
 
 
@@ -60,13 +64,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/google_logo.png
-
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#ffffff" # Change to your brand color
+  adaptive_icon_foreground: "assets/logo.png"
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

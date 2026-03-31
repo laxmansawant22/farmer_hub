@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
               const Icon(Icons.eco, size: 100, color: Colors.white),
               const SizedBox(height: 20),
               const Text(
-                "AgriConnect",
+                "AgriMarket",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
