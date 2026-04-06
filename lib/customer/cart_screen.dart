@@ -63,6 +63,9 @@ class _CartScreenState extends State<CartScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("Please login to place a request");
 
+      // 📍 1. Prepare a Firestore Batch to update stock and orders simultaneously
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+
       String orderId = FirebaseFirestore.instance.collection('orders').doc().id;
 
       final orderData = {
@@ -71,28 +74,42 @@ class _CartScreenState extends State<CartScreen> {
         'customerEmail': user.email,
         'items': globalCart,
         'subtotal': subtotal,
-        'deliveryCharges': totalDeliveryCharge, // 📍 Added to Order Record
+        'deliveryCharges': totalDeliveryCharge,
         'totalAmount': grandTotal,
         'status': 'Requested',
         'timestamp': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance.collection('orders').doc(orderId).set(orderData);
+      // 📍 2. Add Main Order to Batch
+      DocumentReference orderRef = FirebaseFirestore.instance.collection('orders').doc(orderId);
+      batch.set(orderRef, orderData);
 
       for (var item in globalCart) {
-        await FirebaseFirestore.instance.collection('farmer_orders').add({
+        // 📍 3. Add Individual Farmer Orders to Batch
+        DocumentReference farmerOrderRef = FirebaseFirestore.instance.collection('farmer_orders').doc();
+        batch.set(farmerOrderRef, {
           'mainOrderId': orderId,
           'farmerEmail': item['farmerEmail'],
           'productName': item['name'],
           'qty': item['cartQty'],
           'unit': item['unit'],
           'price': item['price'],
-          'deliveryCharge': (item['isDeliveryAvailable'] ?? false) ? item['deliveryCharge'] : 0, // 📍 Added for farmer view
+          'deliveryCharge': (item['isDeliveryAvailable'] ?? false) ? item['deliveryCharge'] : 0,
           'customerEmail': user.email,
           'status': 'New Order',
           'timestamp': FieldValue.serverTimestamp(),
         });
+
+        // 📍 4. STOCK REDUCTION LOGIC (The critical fix)
+        // This targets the product in the 'products' collection and subtracts the cart quantity
+        DocumentReference productRef = FirebaseFirestore.instance.collection('products').doc(item['id']);
+        batch.update(productRef, {
+          'quantity': FieldValue.increment(-item['cartQty']), 
+        });
       }
+
+      // 📍 5. Execute all database changes at once
+      await batch.commit();
 
       if (!mounted) return;
 

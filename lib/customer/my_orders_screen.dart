@@ -10,37 +10,72 @@ import 'package:printing/printing.dart';
 class MyOrdersScreen extends StatelessWidget {
   const MyOrdersScreen({super.key});
 
+  // 📍 1. Fixed Call Logic (Using toString() to prevent type errors)
   void _makeCall(String? phoneNumber, BuildContext context) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) {
+    if (phoneNumber == null || phoneNumber.toString().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Phone number not available")),
       );
       return;
     }
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    } else {
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber.toString());
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch';
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Could not launch dialer")),
+        const SnackBar(content: Text("Could not open dialer")),
       );
     }
   }
 
-  // 📍 1. Generate Detailed Invoice PDF
+  // 📍 2. Logout Confirmation Dialog
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Logout Confirmation"),
+        content: const Text("Are you sure you want to logout from your account?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Logout", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📍 3. Generate Detailed Invoice PDF (Fixed Table Order & Type Casting)
   Future<void> _generateInvoice(Map<String, dynamic> order, String docId) async {
     final pdf = pw.Document();
-    final date = order['timestamp'] != null ? (order['timestamp'] as Timestamp).toDate() : DateTime.now();
+    final date = order['timestamp'] != null
+        ? (order['timestamp'] as Timestamp).toDate()
+        : DateTime.now();
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        build: (context) => pw.Column(
+        build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(child: pw.Text("TAX INVOICE", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
             pw.SizedBox(height: 20),
-            
+
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -50,8 +85,8 @@ class MyOrdersScreen extends StatelessWidget {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text("SOLD BY (Seller):", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(order['farmerName'] ?? 'Verified Seller'),
-                      pw.Text("Phone: ${order['farmerPhone'] ?? 'N/A'}"),
+                      pw.Text(order['farmerName']?.toString() ?? 'Verified Farmer'),
+                      pw.Text("Phone: ${order['farmerPhone']?.toString() ?? 'N/A'}"),
                     ],
                   ),
                 ),
@@ -60,9 +95,9 @@ class MyOrdersScreen extends StatelessWidget {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text("BILL TO (Customer):", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(order['customerName'] ?? 'Customer'),
-                      pw.Text("Phone: ${order['customerPhone'] ?? 'N/A'}"),
-                      pw.Container(width: 150, child: pw.Text("Addr: ${order['deliveryAddress'] ?? 'N/A'}", style: const pw.TextStyle(fontSize: 9))),
+                      pw.Text(order['customerName']?.toString() ?? 'Customer'),
+                      pw.Text("Phone: ${order['customerPhone']?.toString() ?? 'N/A'}"),
+                      pw.Container(width: 150, child: pw.Text("Addr: ${order['deliveryAddress']?.toString() ?? 'N/A'}", style: const pw.TextStyle(fontSize: 9))),
                     ],
                   ),
                 ),
@@ -70,7 +105,7 @@ class MyOrdersScreen extends StatelessWidget {
             ),
             pw.SizedBox(height: 15),
             pw.Divider(),
-            
+
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -81,16 +116,27 @@ class MyOrdersScreen extends StatelessWidget {
             pw.SizedBox(height: 15),
 
             pw.TableHelper.fromTextArray(
-              headers: ['Product', 'Price', 'Qty', 'Total'],
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              data: (order['items'] as List).map((item) => [
-                item['name'],
-                "Rs ${item['price']}",
-                "${item['cartQty']}",
-                "Rs ${(item['price'] * item['cartQty']).toStringAsFixed(2)}"
-              ]).toList(),
+              headers: ['Sr.', 'Product', 'Farmer', 'Price', 'Delivery', 'Qty', 'Total'],
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              cellStyle: const pw.TextStyle(fontSize: 9),
+              data: List.generate((order['items'] as List).length, (index) {
+                var item = order['items'][index];
+                double price = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
+                int qty = int.tryParse(item['cartQty']?.toString() ?? '1') ?? 1;
+                double delFee = double.tryParse(order['deliveryCharges']?.toString() ?? '0') ?? 0.0;
+
+                return [
+                  "${index + 1}",
+                  item['name']?.toString() ?? 'N/A',
+                  order['farmerName']?.toString() ?? "N/A",
+                  "Rs ${price.toStringAsFixed(2)}",
+                  "Rs ${delFee.toStringAsFixed(2)}",
+                  "$qty",
+                  "Rs ${(price * qty).toStringAsFixed(2)}"
+                ];
+              }),
             ),
-            
+
             pw.SizedBox(height: 20),
 
             pw.Align(
@@ -98,10 +144,10 @@ class MyOrdersScreen extends StatelessWidget {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text("Subtotal: Rs ${order['subtotal']}"),
-                  pw.Text("Delivery Charges: Rs ${order['deliveryCharges']}"),
+                  pw.Text("Subtotal: Rs ${order['subtotal']?.toString() ?? '0'}"),
+                  pw.Text("Delivery Charges: Rs ${order['deliveryCharges']?.toString() ?? '0'}"),
                   pw.Container(width: 100, child: pw.Divider()),
-                  pw.Text("Total Amount: Rs ${order['totalAmount']}", 
+                  pw.Text("Total Amount: Rs ${order['totalAmount']?.toString() ?? '0'}",
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
                 ],
               ),
@@ -114,6 +160,7 @@ class MyOrdersScreen extends StatelessWidget {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
+  // 📍 4. View Seller Dialog (Fixed empty info)
   void _viewSellerProfile(BuildContext context, Map<String, dynamic> order) {
     showDialog(
       context: context,
@@ -124,18 +171,21 @@ class MyOrdersScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircleAvatar(
-              radius: 30,
+              radius: 35,
               backgroundColor: Color(0xFF4A6D41),
-              child: Icon(Icons.storefront, color: Colors.white, size: 30),
+              child: Icon(Icons.storefront, color: Colors.white, size: 35),
             ),
-            const SizedBox(height: 10),
-            Text(order['farmerName'] ?? "Farmer", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87)),
-            const Divider(),
+            const SizedBox(height: 15),
+            Text(order['farmerName']?.toString() ?? "Farmer Name Not Found",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 5),
+            const Text("Verified Agriculture Seller", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Divider(height: 30),
             ListTile(
               leading: const Icon(Icons.phone, color: Colors.green),
-              title: Text(order['farmerPhone'] ?? "N/A", style: const TextStyle(color: Colors.black)),
-              dense: true,
-              onTap: () => _makeCall(order['farmerPhone'], context),
+              title: Text(order['farmerPhone']?.toString() ?? "No Phone Number"),
+              subtitle: const Text("Tap to call"),
+              onTap: () => _makeCall(order['farmerPhone']?.toString(), context),
             ),
           ],
         ),
@@ -146,7 +196,7 @@ class MyOrdersScreen extends StatelessWidget {
     );
   }
 
-  // 📍 2. Report Issue Logic
+  // 📍 5. Report Issue Logic
   void _showReportIssueSheet(BuildContext context, String orderId) {
     final TextEditingController reasonController = TextEditingController();
     showModalBottomSheet(
@@ -160,14 +210,12 @@ class MyOrdersScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text("Report an Issue", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            const Text("What went wrong with your order?", style: TextStyle(color: Colors.black54)),
             const SizedBox(height: 15),
             TextField(
               controller: reasonController,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: "e.g., Damaged items, missing quantity...",
+                hintText: "Tell us what happened with your order...",
                 border: OutlineInputBorder(),
               ),
             ),
@@ -183,7 +231,7 @@ class MyOrdersScreen extends StatelessWidget {
                   'status': 'Pending',
                 });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Issue reported. We will look into it.")));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Issue reported successfully.")));
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(double.infinity, 45)),
               child: const Text("Submit Report", style: TextStyle(color: Colors.white)),
@@ -201,9 +249,15 @@ class MyOrdersScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Track My Orders"),
+        title: const Text("My Orders"),
         backgroundColor: const Color(0xFF4A6D41),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _showLogoutDialog(context),
+          )
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -218,7 +272,9 @@ class MyOrdersScreen extends StatelessWidget {
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text("No orders found."));
 
           return ListView.builder(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(12),
+            cacheExtent: 1000, // Smooth scrolling optimization
+            physics: const BouncingScrollPhysics(),
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
               var orderData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
@@ -232,88 +288,78 @@ class MyOrdersScreen extends StatelessWidget {
   }
 
   Widget _buildOrderCard(BuildContext context, Map<String, dynamic> order, String docId) {
-    String status = order['status'] ?? "Requested";
+    String status = order['status']?.toString() ?? "Requested";
     List items = order['items'] as List? ?? [];
-    String productNames = items.map((i) => i['name']).join(", ");
+    String productNames = items.map((i) => i['name']?.toString() ?? 'N/A').join(", ");
+    String farmerReason = order['rejectionReason']?.toString() ?? "No reason provided.";
 
     return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ListTile(
-            title: Text(productNames, 
-                maxLines: 1, 
+            title: Text(productNames,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A6D41))),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Order ID: #${docId.substring(0, 8)}", style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                Text(order['timestamp'] != null 
-                    ? DateFormat('dd MMM, hh:mm a').format((order['timestamp'] as Timestamp).toDate()) 
-                    : "Just now"),
-              ],
-            ),
+            subtitle: Text("ID: #${docId.substring(0, 8)} | ${order['timestamp'] != null ? DateFormat('dd MMM').format((order['timestamp'] as Timestamp).toDate()) : ''}"),
             trailing: _statusChip(status),
           ),
-          
-          const Divider(height: 0),
-          
+
+          // 📍 Rejection Reason UI
+          if (status == 'Rejected')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+              decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Text("Reason: $farmerReason", style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold)),
+            ),
+
+          const Divider(height: 20),
+
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                TextButton.icon(
-                  onPressed: () => _viewSellerProfile(context, order),
-                  icon: const Icon(Icons.person_pin, size: 20, color: Colors.black87),
-                  label: const Text("View Seller", style: TextStyle(color: Colors.black87)),
-                ),
-                TextButton.icon(
-                  onPressed: () => _generateInvoice(order, docId),
-                  icon: const Icon(Icons.file_download, size: 20, color: Colors.black87),
-                  label: const Text("Invoice", style: TextStyle(color: Colors.black87)),
-                ),
-                // 📍 New Report Issue Button for Delivered Orders
+                _actionButton(Icons.person_outline, "Seller", () => _viewSellerProfile(context, order)),
+                // 📍 Hide invoice if rejected
+                if (status != 'Rejected')
+                  _actionButton(Icons.receipt_long_outlined, "Invoice", () => _generateInvoice(order, docId)),
                 if (status == 'Delivered')
-                  TextButton.icon(
-                    onPressed: () => _showReportIssueSheet(context, docId),
-                    icon: const Icon(Icons.report_problem, size: 20, color: Colors.red),
-                    label: const Text("Issue", style: TextStyle(color: Colors.red)),
-                  ),
+                  _actionButton(Icons.report_gmailerrorred_outlined, "Issue", () => _showReportIssueSheet(context, docId), color: Colors.red),
               ],
             ),
           ),
 
-          const Divider(height: 0),
+          const SizedBox(height: 10),
 
           if (status == 'Delivered') _RatingManager(order: order, orderId: docId),
 
           Padding(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 if (status != 'Delivered' && status != 'Rejected')
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _makeCall(order['farmerPhone'], context),
-                      icon: const Icon(Icons.call, size: 18),
-                      label: const Text("Call Farmer"),
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.black87),
+                    child: ElevatedButton.icon(
+                      onPressed: () => _makeCall(order['farmerPhone']?.toString(), context),
+                      icon: const Icon(Icons.call, size: 18, color: Colors.white),
+                      label: const Text("Call Farmer", style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A6D41)),
                     ),
                   ),
                 if (status == 'Shipping') ...[
                   const SizedBox(width: 10),
                   Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _confirmOrderReceived(context, docId),
-                      icon: const Icon(Icons.check_circle, color: Colors.white),
-                      label: const Text("Confirm Received", style: TextStyle(color: Colors.white)),
+                    child: ElevatedButton(
+                      onPressed: () => FirebaseFirestore.instance.collection('orders').doc(docId).update({'status': 'Delivered'}),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      child: const Text("Confirm Received", style: TextStyle(color: Colors.white)),
                     ),
                   ),
                 ],
@@ -325,22 +371,25 @@ class MyOrdersScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmOrderReceived(BuildContext context, String orderId) async {
-    await FirebaseFirestore.instance.collection('orders').doc(orderId).update({'status': 'Delivered'});
+  Widget _actionButton(IconData icon, String label, VoidCallback onTap, {Color color = Colors.black87}) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18, color: color),
+      label: Text(label, style: TextStyle(color: color, fontSize: 12)),
+    );
   }
 
   Widget _statusChip(String status) {
     Color color = status == 'Delivered' ? Colors.green : (status == 'Rejected' ? Colors.red : Colors.blue);
-    return Chip(
-      label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 11)),
-      backgroundColor: color,
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+      child: Text(status, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 }
 
-// 📍 Rating Component (Same as your logic)
+// 📍 Rating Section (Logic Preserved)
 class _RatingManager extends StatelessWidget {
   final Map<String, dynamic> order;
   final String orderId;
@@ -356,33 +405,34 @@ class _RatingManager extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                 showModalBottomSheet(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            child: InkWell(
+              onTap: () {
+                showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
                   builder: (context) => _RatingSheet(order: order, orderId: orderId),
                 );
               },
-              icon: const Icon(Icons.star, color: Colors.white),
-              label: const Text("Rate Products", style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(border: Border.all(color: Colors.orange), borderRadius: BorderRadius.circular(8)),
+                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.star_outline, color: Colors.orange), SizedBox(width: 10), Text("Rate Products", style: TextStyle(color: Colors.orange))]),
+              ),
             ),
           );
         }
 
         var review = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-        return Container(
-          width: double.infinity,
+        int rating = int.tryParse(review['rating']?.toString() ?? '0') ?? 0;
+        return Padding(
           padding: const EdgeInsets.all(12),
-          color: Colors.orange.withOpacity(0.05),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Your Feedback:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
-              Row(children: List.generate(5, (i) => Icon(i < (review['rating'] ?? 0) ? Icons.star : Icons.star_border, color: Colors.orange, size: 16))),
-              Text("\"${review['review']}\"", style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: Colors.black87)),
+              const Text("Your Feedback:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              Row(children: List.generate(5, (i) => Icon(i < rating ? Icons.star : Icons.star_border, color: Colors.orange, size: 16))),
+              Text("\"${review['review']?.toString() ?? ''}\"", style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13)),
             ],
           ),
         );
@@ -411,11 +461,11 @@ class _RatingSheetState extends State<_RatingSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text("Rate Your Experience", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("Rate Your Purchase", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (i) => IconButton(
-              icon: Icon(i < _rating ? Icons.star : Icons.star_border, color: Colors.orange, size: 40),
+              icon: Icon(i < _rating ? Icons.star : Icons.star_border, color: Colors.orange, size: 35),
               onPressed: () => setState(() => _rating = i + 1),
             )),
           ),
@@ -427,7 +477,7 @@ class _RatingSheetState extends State<_RatingSheet> {
                 'orderId': widget.orderId,
                 'rating': _rating,
                 'review': _reviewController.text,
-                'customerName': FirebaseAuth.instance.currentUser?.displayName ?? "User",
+                'customerName': FirebaseAuth.instance.currentUser?.displayName ?? "Customer",
                 'timestamp': FieldValue.serverTimestamp(),
               });
               Navigator.pop(context);

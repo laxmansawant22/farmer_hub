@@ -33,7 +33,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _openMap() async {
-    // Attempt to get coordinates from productData
     double? lat = widget.productData['lat'] != null ? double.tryParse(widget.productData['lat'].toString()) : null;
     double? lng = widget.productData['lng'] != null ? double.tryParse(widget.productData['lng'].toString()) : null;
 
@@ -48,7 +47,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (Platform.isIOS) {
       mapUri = Uri.parse("https://maps.apple.com/?q=$lat,$lng");
     } else {
-      // Android: use geo intent
       mapUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng");
     }
 
@@ -56,7 +54,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       if (await canLaunchUrl(mapUri)) {
         await launchUrl(mapUri, mode: LaunchMode.externalApplication);
       } else {
-        // Fallback for browsers
         final googleUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
         await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
       }
@@ -77,6 +74,34 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       globalCart.add(cartItem);
       setState(() => _isAddedToCart = true);
     }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Added to Cart"), duration: Duration(seconds: 1)));
+  }
+
+  void _confirmCall(String phoneNumber) {
+    if (phoneNumber.isEmpty || phoneNumber == "null") {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Farmer phone number not available")));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Call Farmer?"),
+        content: Text("Do you want to call $phoneNumber?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _makeCall(phoneNumber);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text("Call Now", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _makeCall(String phoneNumber) async {
@@ -91,17 +116,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   void _submitReview() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     if (_reviewController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please write a comment")));
       return;
     }
 
     String farmerEmail = widget.productData['farmerEmail'].toString().trim();
-
     await FirebaseFirestore.instance.collection('reviews').add({
       'farmerEmail': farmerEmail,
-      'farmerId': widget.productData['farmerId'], 
+      'farmerId': widget.productData['farmerId'],
       'productId': widget.productData['id'],
       'customerName': user.displayName ?? "Customer",
       'rating': _userRating,
@@ -146,7 +169,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           num stock = 0;
           if (snapshot.hasData && snapshot.data!.exists) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
-            stock = data['quantity'] is num ? data['quantity'] : (num.tryParse(data['quantity'].toString()) ?? 0);
+            stock = (num.tryParse(data['quantity'].toString()) ?? 0);
+          }
+
+          // Safety check: reset quantity if it exceeds current live stock
+          if (_quantity > stock && stock > 0) {
+            _quantity = stock.toInt();
           }
 
           return SingleChildScrollView(
@@ -160,11 +188,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildMainDetails(price, unit),
-                      const SizedBox(height: 10),
-                      _buildFarmerCard(),
+                      const SizedBox(height: 15),
+                      _buildFarmerMiniRow(),
                       const SizedBox(height: 20),
                       _buildDeliveryInfo(isDelivery, deliveryCharge, deliveryReq),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 25),
                       _buildMapButton(),
                       const SizedBox(height: 15),
                       _buildStockText(stock, unit),
@@ -173,9 +201,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       const SizedBox(height: 30),
                       _buildActionButtons(stock, unit),
                       const Divider(height: 40),
-
                       _buildReviewSection(fEmail),
-
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -187,8 +213,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
     );
   }
-
-  // --- UI Component Helper Methods ---
 
   Widget _buildImageHeader(String base64Image, String method) {
     return Stack(
@@ -228,20 +252,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _buildFarmerCard() {
+  Widget _buildFarmerMiniRow() {
     return InkWell(
       onTap: _showFarmerProfile,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-        child: Row(
-          children: [
-            const CircleAvatar(backgroundColor: Color(0xFF4A6D41), child: Icon(Icons.person, color: Colors.white)),
-            const SizedBox(width: 12),
-            Expanded(child: Text(AppTranslations.translate(context, 'view_farmer_profile'), style: const TextStyle(fontWeight: FontWeight.bold))),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
+      child: Row(
+        children: [
+          const CircleAvatar(radius: 14, backgroundColor: Color(0xFF4A6D41), child: Icon(Icons.person, color: Colors.white, size: 16)),
+          const SizedBox(width: 10),
+          Text(AppTranslations.translate(context, 'view_farmer_profile'), style: const TextStyle(fontSize: 14, color: Colors.blueGrey, decoration: TextDecoration.underline)),
+        ],
       ),
     );
   }
@@ -279,14 +298,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildMapButton() {
-    return OutlinedButton.icon(
-      onPressed: _openMap,
-      icon: const Icon(Icons.map_outlined),
-      label: Text(AppTranslations.translate(context, 'show_on_map')),
-      style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 50),
-          foregroundColor: Colors.blue,
-          side: const BorderSide(color: Colors.blue)
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _openMap,
+        icon: const Icon(Icons.location_on_outlined),
+        label: Text(AppTranslations.translate(context, 'show_on_map'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            foregroundColor: const Color(0xFF2E7D32),
+            side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+        ),
       ),
     );
   }
@@ -308,36 +331,60 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildActionButtons(num stock, String unit) {
-    return Row(
+    String phone = widget.productData['phone']?.toString() ?? "";
+
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _makeCall(widget.productData['phone'] ?? ""),
-            icon: const Icon(Icons.call, color: Colors.white),
-            label: Text(AppTranslations.translate(context, 'call_farmer')),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 15)),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: stock <= 0 ? Center(child: Text(AppTranslations.translate(context, 'sold_out'), style: const TextStyle(color: Colors.red)))
-              : (_isAddedToCart ? Container(
-            height: 55,
-            decoration: BoxDecoration(border: Border.all(color: Colors.orange), borderRadius: BorderRadius.circular(12)),
+        if (!_isAddedToCart && stock > 0) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(icon: const Icon(Icons.remove), onPressed: () { if (_quantity > 1) { setState(() => _quantity--); _updateCart(); } }),
-                Text("$_quantity $unit", style: const TextStyle(fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.add), onPressed: () { if (_quantity < stock) { setState(() => _quantity++); _updateCart(); } }),
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                  onPressed: () { if (_quantity > 1) setState(() => _quantity--); },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text("$_quantity $unit", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                  onPressed: () { if (_quantity < stock) setState(() => _quantity++); },
+                ),
               ],
             ),
-          )
-              : ElevatedButton(
-            onPressed: _updateCart,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 15)),
-            child: Text(AppTranslations.translate(context, 'add_to_cart'), style: const TextStyle(color: Colors.white)),
-          )),
+          ),
+          const SizedBox(height: 15),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _confirmCall(phone), 
+                icon: const Icon(Icons.call, color: Colors.white),
+                label: Text(AppTranslations.translate(context, 'call_farmer')),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 15)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: stock <= 0 ? Center(child: Text(AppTranslations.translate(context, 'sold_out'), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))
+                  : (_isAddedToCart ? Container(
+                height: 50,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
+                child: const Text("In Cart ✔", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              )
+                  : ElevatedButton(
+                onPressed: _updateCart,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 15)),
+                child: Text(AppTranslations.translate(context, 'add_to_cart'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              )),
+            ),
+          ],
         ),
       ],
     );
@@ -363,10 +410,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
             var reviews = snapshot.data!.docs;
-
-            if (reviews.isEmpty) {
-              return Text(AppTranslations.translate(context, 'no_reviews_yet'), style: const TextStyle(color: Colors.grey));
-            }
+            if (reviews.isEmpty) return Text(AppTranslations.translate(context, 'no_reviews_yet'), style: const TextStyle(color: Colors.grey));
 
             return ListView.builder(
               shrinkWrap: true,
@@ -389,19 +433,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         Text(" ${rev['rating']}", style: const TextStyle(fontSize: 12)),
                       ],
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(rev['review'] ?? rev['comment'] ?? ""),
-                        if(rev['farmerReply'] != null)
-                          Container(
-                            margin: const EdgeInsets.only(top: 5),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(5)),
-                            child: Text("Farmer: ${rev['farmerReply']}", style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-                          ),
-                      ],
-                    ),
+                    subtitle: Text(rev['review'] ?? rev['comment'] ?? ""),
                   ),
                 );
               },
@@ -413,7 +445,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _showRatingDialog() {
-    _userRating = 5.0; // Reset
+    _userRating = 5.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -448,7 +480,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7, maxChildSize: 0.9, expand: false,
+        initialChildSize: 0.5, maxChildSize: 0.7, expand: false,
         builder: (context, scrollController) => StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance.collection('users').doc(fEmail).snapshots(),
           builder: (context, snapshot) {
@@ -457,22 +489,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
             return ListView(
               controller: scrollController,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(25),
               children: [
                 Center(
                   child: CircleAvatar(
-                    radius: 50,
-                    backgroundImage: farmer?['imageUrl'] != null ? MemoryImage(base64Decode(farmer!['imageUrl'])) : null,
-                    child: farmer?['imageUrl'] == null ? const Icon(Icons.person, size: 50) : null,
+                    radius: 45,
+                    backgroundImage: (farmer?['imageUrl'] != null && farmer!['imageUrl'].toString().isNotEmpty)
+                        ? MemoryImage(base64Decode(farmer['imageUrl']))
+                        : null,
+                    child: farmer?['imageUrl'] == null ? const Icon(Icons.person, size: 45) : null,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
                 Center(child: Text(farmer?['name'] ?? "Farmer", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-                const Divider(height: 30),
-                _infoRow(Icons.location_on, AppTranslations.translate(context, 'farm_location'), farmer?['address'] ?? "N/A"),
-                _infoRow(Icons.history, AppTranslations.translate(context, 'experience'), farmer?['experience'] ?? "Verified Farmer"),
-                const SizedBox(height: 20),
-                _buildReviewSection(fEmail),
+                const SizedBox(height: 5),
+                const Center(child: Text("Verified AgriMarket Partner", style: TextStyle(color: Colors.green, fontSize: 13))),
+                const Divider(height: 40),
+                _infoRow(Icons.location_on_outlined, AppTranslations.translate(context, 'farm_location'), farmer?['address'] ?? "Address not provided"),
+                _infoRow(Icons.history_edu_outlined, AppTranslations.translate(context, 'experience'), farmer?['experience'] ?? "Experienced Farmer"),
+                const SizedBox(height: 30),
               ],
             );
           },
@@ -483,12 +518,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF4A6D41)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: const Color(0xFF4A6D41), size: 20),
+          ),
           const SizedBox(width: 15),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))])),
         ],
       ),
     );

@@ -35,7 +35,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _farmPhotos.add(File(pickedFile.path));
         }
       });
-      // Note: You would typically upload this to Firestore here
     }
   }
 
@@ -72,13 +71,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           if (snapshot.hasData && snapshot.data!.exists) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
-            name = data['name'] ?? name;
-            phone = data['phone'] ?? phone;
-            address = data['address'] ?? address;
-            imageUrlBase64 = data['imageUrl'] ?? "";
-            farmType = data['farmType'] ?? farmType;
-            farmSize = data['farmSize'] ?? farmSize;
-            storeName = data['storeName'] ?? storeName;
+            name = data['name']?.toString() ?? name;
+            phone = data['phone']?.toString() ?? phone;
+            address = data['address']?.toString() ?? address;
+            imageUrlBase64 = data['imageUrl']?.toString() ?? "";
+            farmType = data['farmType']?.toString() ?? farmType;
+            // 📍 FIXED: Convert double to String to prevent the subtype error
+            farmSize = data['farmSize']?.toString() ?? farmSize;
+            storeName = data['storeName']?.toString() ?? storeName;
           }
 
           return SingleChildScrollView(
@@ -145,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 30),
 
-                // 📍 PHOTOS SECTION (Hidden for Customers)
+                // 📍 PHOTOS SECTION
                 if (widget.role == 'farmer' || widget.role == 'store') ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -261,7 +261,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
+        // 📍 FIXED: Changed 'border' to 'side' or simplified BoxDecoration
+        border: Border.all(color: Colors.grey[300]!),
       ),
       child: const Center(
           child: Text(

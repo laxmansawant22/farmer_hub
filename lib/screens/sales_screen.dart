@@ -47,16 +47,19 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
+  // Helper to get Customer Data
   Future<Map<String, dynamic>> _getUserData(String email) async {
     var snap = await FirebaseFirestore.instance.collection('users').doc(email).get();
     return snap.data() ?? {'name': email, 'phone': 'N/A', 'address': 'N/A'};
   }
 
+  // Helper to get Farmer Data
   Future<Map<String, dynamic>> _getFarmerData() async {
     var snap = await FirebaseFirestore.instance.collection('users').doc(farmerEmail).get();
     return snap.data() ?? {'name': 'Farmer', 'phone': 'N/A', 'address': 'N/A'};
   }
 
+  // 📍 FIXED PDF: Uses MultiPage to prevent "Too Many Pages" error
   Future<void> _generatePdf(List<QueryDocumentSnapshot> docs, double total, String periodLabel, {bool isShare = true}) async {
     try {
       final pdf = pw.Document();
@@ -198,7 +201,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
           ),
         ),
       );
-      await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'Invoice $orderId.pdf');
+      await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'Invoice_$orderId.pdf');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Invoice Error: $e")));
     }
@@ -211,8 +214,9 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
       builder: (context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
+          mainAxisSize: MainAxisSize.min, // 📍 FIXED: Use MainAxisSize.min
           children: [
-            Text(AppTranslations.translate(context, 'select period'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(AppTranslations.translate(context, 'select_period'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 15),
             ListTile(
               leading: const Icon(Icons.date_range, color: Color(0xFF4A6D41)),
@@ -274,7 +278,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
             return Padding(
               padding: const EdgeInsets.all(25),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.min, // 📍 FIXED: Use MainAxisSize.min
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -331,33 +335,31 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
             }
           },
         ),
-        title: Text(AppTranslations.translate(context, 'Sales analytics')),
+        title: Text(AppTranslations.translate(context, 'sales_analytics')),
         backgroundColor: const Color(0xFF4A6D41),
         foregroundColor: Colors.white,
         actions: [
           if (_selectedDateRange != null)
             IconButton(icon: const Icon(Icons.filter_alt_off), onPressed: () => setState(() => _selectedDateRange = null)),
           IconButton(icon: const Icon(Icons.calendar_month), onPressed: () async {
-            final picked = await showDateRangePicker(context: context, firstDate: DateTime(2023), lastDate: DateTime.now());
+            final picked = await showDateRangePicker(context: context, firstDate: DateTime(2024), lastDate: DateTime.now());
             if (picked != null) setState(() { _selectedDateRange = picked; });
           })
         ],
+        // 📍 FIXED: Analytics and History Tabs set to WHITE
         bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: Colors.white,
-            // This sets the color for the currently selected tab
-            labelColor: Colors.white,
-            // This sets the "dark white" / grey color for the unselected tabs
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(text: AppTranslations.translate(context, 'analytics')),
-              Tab(text: AppTranslations.translate(context, 'history')),
-
-
-        ]),
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white, // Active text white
+          unselectedLabelColor: Colors.white70, // Inactive text slightly transparent white
+          tabs: [
+            Tab(text: AppTranslations.translate(context, 'analytics')),
+            Tab(text: AppTranslations.translate(context, 'history'))
+          ],
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('farmer orders')
+        stream: FirebaseFirestore.instance.collection('farmer_orders')
             .where('farmerEmail', isEqualTo: farmerEmail)
             .where('status', whereIn: ['Shipped', 'Delivered', 'Completed', 'Received', 'shipped', 'delivered', 'completed', 'received'])
             .orderBy('timestamp', descending: true).snapshots(),
@@ -402,7 +404,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
           child: ElevatedButton.icon(
             onPressed: () => _showReportOptions(allDocs),
             icon: const Icon(Icons.picture_as_pdf),
-            label: Text(AppTranslations.translate(context, 'Download report')),
+            label: Text(AppTranslations.translate(context, 'download_report')),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[800], foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
           ),
         ),
@@ -441,28 +443,18 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
             double total = ((data['price'] ?? 0) * (data['qty'] ?? 0)) + (double.tryParse(data['deliveryCharge']?.toString() ?? '0') ?? 0.0);
             return Card(
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-                // 📍 FIXED: Changed parameter to 'side' and used BorderSide
-                side: BorderSide(color: Colors.grey[200]!, width: 1),
-              ),
+              // 📍 FIXED: Changed 'border' to 'side'
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.grey[200]!)),
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
                 onTap: () => _showOrderDetails(data, filteredDocs[index].id),
-                leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF4A6D41),
-                    child: Icon(Icons.shopping_bag, color: Colors.white, size: 18)
-                ),
+                leading: const CircleAvatar(backgroundColor: Color(0xFF4A6D41), child: Icon(Icons.shopping_bag, color: Colors.white, size: 18)),
                 title: Text(data['productName'] ?? "Product", style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(DateFormat('dd MMM, yyyy').format((data['timestamp'] as Timestamp).toDate())),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text("₹${total.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                    Text(data['status'] ?? "", style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-                  ],
-                ),
+                trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text("₹${total.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text(data['status'] ?? "", style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                ]),
               ),
             );
           },
